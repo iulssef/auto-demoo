@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Firebase Users</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; padding: 20px; background-color: #f4f7f6; }
+        .container { max-width: 500px; margin: 0 auto; background: white; padding: 25px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: #333; }
+        input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 16px; }
+        button { width: 100%; padding: 12px; margin-top: 10px; cursor: pointer; color: white; border: none; border-radius: 6px; font-weight: bold; font-size: 16px; transition: 0.3s; }
+        #addBtn { background-color: #FFA000; } /* Цвет Firebase */
+        #addBtn:hover { background-color: #e68a00; }
+        #showBtn { background-color: #333; }
+        #showBtn:hover { background-color: #555; }
+        button:disabled { background-color: #ccc; cursor: not-allowed; }
+        
+        ul { list-style: none; padding: 0; margin-top: 20px; }
+        li { background: #f9f9f9; margin: 8px 0; padding: 15px; border-left: 5px solid #FFA000; border-radius: 4px; display: flex; justify-content: space-between; }
+        .status { margin-top: 15px; font-weight: bold; color: green; text-align: center; display: none; }
+        .status.show { display: block; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Firebase (Firestore)</h2>
+    <input type="text" id="loginInput" placeholder="Логин (username)" autocomplete="off">
+    <input type="password" id="passInput" placeholder="Пароль (password)" autocomplete="off">
+    <button id="addBtn">Добавить (Insert)</button>
+    <button id="showBtn">Показать всех (Select)</button>
+    
+    <div id="status" class="status"></div>
+    
+    <h3>Список пользователей:</h3>
+    <ul id="usersList">
+        <li style="border-left-color: #ccc; color: #888; justify-content: center;">Нажмите "Показать всех"</li>
+    </ul>
+</div>
+
+<!-- Подключаем SDK Firebase (Модули) -->
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    // ==========================================
+    // ВАШИ КЛЮЧИ FIREBASE
+    // ==========================================
+    const firebaseConfig = {
+        apiKey: "AIzaSyCn3hMLqRXxG5xNTHFJEyxodw-ItvQ7UT0",
+        authDomain: "iulssef.firebaseapp.com",
+        projectId: "iulssef",
+        storageBucket: "iulssef.firebasestorage.app",
+        messagingSenderId: "951816826880",
+        appId: "1:951816826880:web:91ce91394ea110b97468e5",
+        measurementId: "G-YRNWRM5G9K"
+    };
+
+    // Инициализация Firebase
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const usersCollection = collection(db, "Users"); // Название коллекции
+
+    // Функция для вывода статуса
+    function showStatus(msg) {
+        const el = document.getElementById('status');
+        el.textContent = msg;
+        el.classList.add('show');
+        setTimeout(() => el.classList.remove('show'), 3000);
+    }
+
+    // --- ВСТАВКА (INSERT) ---
+    document.getElementById('addBtn').addEventListener('click', async () => {
+        const login = document.getElementById('loginInput').value.trim();
+        const pass = document.getElementById('passInput').value.trim();
+
+        if (!login || !pass) { alert("Заполните логин и пароль!"); return; }
+
+        document.getElementById('addBtn').disabled = true;
+
+        try {
+            // Добавляем документ в коллекцию
+            await addDoc(usersCollection, {
+                username: login,
+                password: pass
+            });
+            showStatus('Пользователь добавлен!');
+            document.getElementById('loginInput').value = '';
+            document.getElementById('passInput').value = '';
+            loadUsers(); // Обновляем список
+        } catch (e) {
+            console.error("Ошибка вставки: ", e);
+            alert("Ошибка: " + e.message);
+        } finally {
+            document.getElementById('addBtn').disabled = false;
+        }
+    });
+
+    // --- ВЫВОД (SELECT) ---
+    async function loadUsers() {
+        const list = document.getElementById('usersList');
+        list.innerHTML = '<li style="border-left-color: #ccc; color: #888; justify-content: center;">Загрузка...</li>';
+
+        try {
+            // Получаем все документы из коллекции
+            const querySnapshot = await getDocs(usersCollection);
+            list.innerHTML = ''; // Очищаем список
+
+            if (querySnapshot.empty) {
+                list.innerHTML = '<li style="border-left-color: #ccc; color: #888; justify-content: center;">База данных пуста</li>';
+                return;
+            }
+
+            // Перебираем документы
+            querySnapshot.forEach((doc) => {
+                const user = doc.data();
+                const li = document.createElement('li');
+                li.innerHTML = `<span><b>Логин:</b> ${user.username}</span><span>Пароль: ${user.password}</span>`;
+                list.appendChild(li);
+            });
+        } catch (e) {
+            console.error("Ошибка чтения: ", e);
+            list.innerHTML = '<li style="border-left-color: red; color: red; justify-content: center;">Ошибка загрузки</li>';
+        }
+    }
+
+    // Кнопка "Показать всех"
+    document.getElementById('showBtn').addEventListener('click', loadUsers);
+
+    // Загрузка при старте
+    window.addEventListener('DOMContentLoaded', loadUsers);
+</script>
+</body>
+</html>

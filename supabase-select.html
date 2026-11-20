@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Supabase Users</title>
+    <!-- Подключаем библиотеку Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            padding: 20px; 
+            background-color: #f4f7f6; 
+        }
+        .container { 
+            max-width: 500px; 
+            margin: 0 auto; 
+            background: white; 
+            padding: 25px; 
+            border-radius: 10px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1); 
+        }
+        h2 { text-align: center; color: #333; margin-top: 0; }
+        input { 
+            width: 100%; 
+            padding: 12px; 
+            margin: 8px 0; 
+            border: 1px solid #ccc; 
+            border-radius: 6px; 
+            box-sizing: border-box; 
+            font-size: 16px;
+        }
+        button { 
+            width: 100%; 
+            padding: 12px; 
+            margin-top: 10px; 
+            border: none; 
+            border-radius: 6px; 
+            font-size: 16px; 
+            font-weight: bold; 
+            cursor: pointer; 
+            transition: 0.3s;
+        }
+        #addBtn { background-color: #3ecf8e; color: white; }
+        #addBtn:hover { background-color: #36b37e; }
+        #showBtn { background-color: #333; color: white; }
+        #showBtn:hover { background-color: #555; }
+        button:disabled { background-color: #ccc; cursor: not-allowed; }
+        
+        .status { 
+            margin-top: 15px; 
+            padding: 10px; 
+            border-radius: 6px; 
+            text-align: center; 
+            font-weight: bold; 
+            display: none; 
+        }
+        .status.error { background-color: #ffe6e6; color: #d63031; display: block; }
+        .status.success { background-color: #e6fffa; color: #00b894; display: block; }
+        
+        h3 { color: #333; margin-top: 25px; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        ul { list-style-type: none; padding: 0; }
+        li { 
+            background: #f8f9fa; 
+            margin: 8px 0; 
+            padding: 15px; 
+            border-radius: 6px; 
+            border-left: 5px solid #3ecf8e; 
+            display: flex; 
+            justify-content: space-between; 
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h2>Управление пользователями</h2>
+        
+        <input type="text" id="loginInput" placeholder="Логин (username)" autocomplete="off">
+        <input type="password" id="passInput" placeholder="Пароль (password)" autocomplete="off">
+        
+        <button id="addBtn">Добавить (Insert)</button>
+        <button id="showBtn">Показать всех (Select)</button>
+
+        <div id="statusMessage" class="status"></div>
+
+        <h3>Список из базы:</h3>
+        <ul id="usersList">
+            <li style="border-left-color: #ccc; color: #888; justify-content: center;">Нажмите "Показать всех"</li>
+        </ul>
+    </div>
+
+    <script>
+        // ==========================================
+        // ВАШИ ДАННЫЕ ПОДКЛЮЧЕНИЯ
+        // ==========================================
+        const supabaseUrl = 'https://lixunmxyfsbojqtqzqjj.supabase.co'; 
+        const supabaseKey = 'sb_publishable_0pUMZd2glcjvHqTy8ydnQA_HxijFW-r'; 
+
+        // Инициализация клиента
+        const client = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+        // Вспомогательные функции
+        function showStatus(msg, isError = false) {
+            const el = document.getElementById('statusMessage');
+            el.textContent = msg;
+            el.className = 'status ' + (isError ? 'error' : 'success');
+            setTimeout(() => { el.style.display = 'none'; }, 5000);
+        }
+
+        function setLoading(isLoading) {
+            document.getElementById('addBtn').disabled = isLoading;
+            document.getElementById('showBtn').disabled = isLoading;
+        }
+
+        // --- ЛОГИКА ВСТАВКИ (INSERT) ---
+        document.getElementById('addBtn').addEventListener('click', async () => {
+            const login = document.getElementById('loginInput').value.trim();
+            const pass = document.getElementById('passInput').value.trim();
+
+            if (!login || !pass) {
+                showStatus("Заполните логин и пароль!", true);
+                return;
+            }
+
+            setLoading(true);
+            showStatus("Отправка данных...");
+
+            const { error } = await client
+                .from('Users') 
+                .insert([{ username: login, password: pass }]);
+
+            setLoading(false);
+
+            if (error) {
+                console.error('Ошибка вставки:', error);
+                showStatus('Ошибка: ' + error.message, true);
+            } else {
+                showStatus('Пользователь успешно добавлен!');
+                document.getElementById('loginInput').value = '';
+                document.getElementById('passInput').value = '';
+                loadUsers(); // Обновить список
+            }
+        });
+
+        // --- ЛОГИКА ВЫВОДА (SELECT) ---
+        async function loadUsers() {
+            setLoading(true);
+            const list = document.getElementById('usersList');
+            
+            const { data, error } = await client
+                .from('Users')
+                .select('*');
+
+            setLoading(false);
+
+            if (error) {
+                console.error('Ошибка выборки:', error);
+                list.innerHTML = `<li style="border-left-color: red; color: red;">Ошибка загрузки</li>`;
+                showStatus('Ошибка: ' + error.message, true);
+                return;
+            }
+
+            list.innerHTML = ''; 
+            
+            if (data && data.length > 0) {
+                data.forEach(user => {
+                    const li = document.createElement('li');
+                    li.innerHTML = `
+                        <span><b>Логин:</b> ${user.username}</span>
+                        <span style="color: #555;">Пароль: ${user.password}</span>
+                    `;
+                    list.appendChild(li);
+                });
+                showStatus(`Загружено: ${data.length} записей`);
+            } else {
+                list.innerHTML = '<li style="border-left-color: #ccc; color: #888; justify-content: center;">База данных пуста</li>';
+            }
+        }
+
+        // Кнопка "Показать всех"
+        document.getElementById('showBtn').addEventListener('click', loadUsers);
+
+        // Автозагрузка списка при открытии страницы
+        window.addEventListener('DOMContentLoaded', () => {
+            loadUsers();
+        });
+    </script>
+</body>
+</html>
